@@ -1,0 +1,28 @@
+BootStrap: localimage
+From: base.sif
+
+%labels
+  Maintainer Andersen
+  version 1.0
+
+%help
+  Write some help here
+
+%environment
+  #export all scripts to $PATH
+  export PATH=/opt/scripts/:${PATH}
+
+%files
+  #make all workflow scripts available from inside the container
+  ../scripts/* /opt/scripts/
+  ../databases/* /opt/databases/
+
+%post
+  #install extras here, move to base.singularity when tested
+
+### Default runscripts
+%startscript
+    exec startWorkflow.sh 2>&1
+
+%runscript
+    exec startWorkflow.sh 2>&1

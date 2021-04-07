@@ -1,0 +1,112 @@
+BootStrap: docker
+From: ubuntu:18.04
+
+%labels
+  Maintainer Andersen
+  Version 1.0
+
+%help
+  Base image with all required software and dependencies installed. This image does not include any runscripts, it is only used as a base for the main image to reduce build time when developing runscripts.
+
+%environment
+  #
+
+%setup
+  ./setup.sh
+  export builddir=$(realpath "./build")
+  cp -r ${builddir:?}/* ${SINGULARITY_ROOTFS}/opt/
+
+%files
+  #renv lock file for R packages
+  ../renv.lock /opt/renv.lock
+
+%post
+  mkdir -p /opt
+  cd /opt
+  
+  ### general requirements
+  apt-get update -qqy
+  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends --no-install-suggests \
+      libbz2-dev zlib1g-dev python3.6 python3-pip bzip2 g++ gcc \
+      zlib1g-dev libbz2-dev liblzma-dev libffi-dev libncurses5-dev \
+      libcurl4-gnutls-dev curl make cmake wget \
+      python3-all-dev python-virtualenv git libidn11 nano \
+      pkg-config libfreetype6-dev libpng-dev python-matplotlib \
+      python3-setuptools python3-wheel libgpgme-dev locales
+
+  ### Configure default locale
+  echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen
+  locale-gen en_US.utf8
+  /usr/sbin/update-locale LANG=en_US.UTF-8
+  export LC_ALL=en_US.UTF-8
+  export LANG=en_US.UTF-8
+
+  ### install R and required R packages
+  #specific version of R to be installed
+  R_BASE_VERSION=4.0.3
+
+  #add AAU CRAN mirror to APT lists
+  echo "deb http://mirrors.dotsrc.org/cran/bin/linux/ubuntu bionic-cran40/" > /etc/apt/sources.list.d/R.list
+
+  #retrieve key from keyserver, this may fail if port 11371 is blocked by firewall
+  apt-key adv --keyserver keyserver.ubuntu.com --recv-keys E298A3A825C0D65DFD57CBB651716619E084DAB9
+
+  #install R and (both nice- and need to have) system dependencies
+  apt-get -qqy update
+  DEBIAN_FRONTEND=noninteractive apt-get -y install --no-install-recommends --no-install-suggests \
+  r-base=${R_BASE_VERSION}* \
+  r-base-dev=${R_BASE_VERSION}* \
+  r-recommended=${R_BASE_VERSION}* \
+  libcurl4-openssl-dev \
+  libssl-dev \
+  libxml2-dev \
+  libxt-dev \
+  libcairo2-dev \
+  pandoc
+
+  #enable multithreaded compilation of packages
+  mkdir -p ~/.R
+  echo "MAKEFLAGS = -j" > ~/.R/Makevars
+
+  #set default CRAN mirror
+  echo "options(repos = c(CRAN = 'https://mirrors.dotsrc.org/cran'), download.file.method = 'libcurl')" >> /usr/lib/R/etc/Rprofile.site
+
+  #set default renv package cache for all users
+  echo "RENV_PATHS_CACHE=/usr/local/lib/R/renv-cache/" >> /usr/lib/R/etc/Renviron.site
+
+  #remove user library from .libPaths() as it will be used if user has installed any pkgs there on host system
+  sed -i s/^R_LIBS_USER=/#R_LIBS_USER=/g /etc/R/Renviron
+
+  #install required R packages using renv
+  R -e "install.packages('renv') 
+    renv::consent(provided = TRUE)
+    renv::restore(library = '/usr/local/lib/R/site-library/', clean = TRUE, lockfile = '/opt/renv.lock', prompt = FALSE)"
+
+  ### install miniconda3 in silent mode
+  bash miniconda.sh -b -p /opt/miniconda
+  rm /opt/miniconda.sh
+  #make sure conda init script is available and run when starting container
+  ln -s /opt/miniconda/etc/profile.d/conda.sh /etc/profile.d/conda.sh 
+  echo ". /opt/miniconda/etc/profile.d/conda.sh" >> $SINGULARITY_ENVIRONMENT
+  echo 'export PATH="/opt/miniconda/bin:${PATH}"' >> $SINGULARITY_ENVIRONMENT
+  
+  ### install minimap2
+  /opt/miniconda/bin/conda install -c bioconda minimap2=2.17 -y
+
+  ### install samtools
+  /opt/miniconda/bin/conda install -c bioconda samtools=1.7 -y
+
+  ### install cutadapt
+  /opt/miniconda/bin/conda install -c bioconda cutadapt=1.18 -y
+
+  ### install snakemake
+  /opt/miniconda/bin/conda install -c bioconda -c conda-forge snakemake=6.1.0 -y
+
+  ### install python modules
+  /opt/miniconda/bin/conda install -c conda-forge biopython=1.78 -y
+
+  ### clean up
+  rm -rf /var/lib/apt/lists/* /var/cache/apt/*
+
+%test
+  #run tests after build
