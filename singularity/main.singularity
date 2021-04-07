@@ -22,7 +22,7 @@ From: base.sif
 
 ### Default runscripts
 %startscript
-    exec startWorkflow.sh 2>&1
+    exec startWorkflow.sh "$@"
 
 %runscript
-    exec startWorkflow.sh 2>&1
+    exec startWorkflow.sh "$@"
