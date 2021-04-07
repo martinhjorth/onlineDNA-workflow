@@ -36,7 +36,9 @@ for (file in files){
     header = FALSE,
     sep = "\t",
     col.names = c("readID", "read_time", "add_info")
-  ) %>% separate(add_info, c("barcode", "SAMflag", "OTU", "Qlen", "alnlen", "MapID", "NMtag", "alnscore", "MinimapID"), " ") %>% mutate(SeqID=sub(".idmapped.txt","",file))
+  ) %>% 
+  separate(add_info, c("barcode", "SAMflag", "OTU", "Qlen", "alnlen", "MapID", "NMtag", "alnscore", "MinimapID"), " ") %>%
+   mutate(SeqID=sub(".idmapped.txt","",file))
   mappings<-rbind(mappings,mapping)
 }
 

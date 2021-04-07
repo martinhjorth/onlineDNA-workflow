@@ -5,7 +5,7 @@ import os
 today = datetime.now()
 outDir = today.strftime('%Y-%m-%d') + "_processed"
 
-barcodes = pd.read_csv("dependencies/barcodes.csv", sep=",", header=None, names=["barName", "barFasta"])
+barcodes = pd.read_csv("barcodes.csv", sep=",", header=None, names=["barName", "barFasta"])
 
 metadata_pd = pd.read_csv("metadata.txt", sep=",", header=None, names=["sampleName", "barName"])
 metadata_names = metadata_pd['sampleName'].tolist()
