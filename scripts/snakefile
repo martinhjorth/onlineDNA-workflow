@@ -1,10 +1,10 @@
-import os, glob, subprocess, shutil, Bio#, argparse, random, re, gzip, shutil, subprocess
+import os, glob, subprocess, shutil, Bio#, argparse, random, re, gzip
 from datetime import datetime
 #from pick import pick
 import pandas as pd
 
-dbFasta = "/srv/MA/users/mha/databases/midas37/midas37_notax.fa" # Path to database fasta
-dbTax = "/srv/MA/users/mha/databases/midas37/tax_complete_qiime.txt" # # Path to database taxonomy
+dbFasta = "/opt/databases/midas37/midas37_notax.fa" # Path to database fasta
+dbTax = "/opt/databases/midas37/tax_complete_qiime.txt" # # Path to database taxonomy
 dbName = dbFasta.split("/")[-1].split("_")[-2]
 
 today = datetime.now().strftime('%Y-%m-%d')
@@ -73,7 +73,6 @@ rule trim_outerAdapt:
     shell:
         """
         #!/bin/bash
-        module load cutadapt/2.8-foss-2018a-Python-3.6.4 --quiet
         cutadapt -j {params.threads} -e 0.20 -O 10 -m {params.ampMin_len} -M {params.ampMax_len} --discard-untrimmed --revcomp -g CAGAAGACGGCATACGAGAT...GTGTAGATCTCGGTGGTCGC -o {output.fastq} {input} > {output.qc}
         """
 
@@ -96,7 +95,6 @@ rule demultiplex:
     shell:
         """
         #!/bin/bash
-        module load cutadapt/2.8-foss-2018a-Python-3.6.4 --quiet
         cutadapt -e 0.20 -O 10 -m {params.ampMin_len} -M {params.ampMax_len} -g file:{input.barcodeFile} -o {params.outDir}/{{name}}.tmp {input.fastqFile}
         """
 
@@ -106,7 +104,7 @@ rule revcomp_trim:
     -- Revert sequence orientation to prepare for downstream consensus calling """
     input:
         demux_files = expand(os.path.join(outDir, "{name}.tmp"), name=samples_list),
-        script = "scripts/revcomp.py",
+        script = "/opt/scripts/revcomp.py",
         demuxDir = outDir,
         metadata="metadata.txt"
     output: os.path.join(outDir, "demultiplexed/{libID}.fastq")
@@ -115,7 +113,6 @@ rule revcomp_trim:
     message: "Trimming internal adapters and reverse complementing"
     shell:
         """
-        #module load Python/3.6.4-foss-2018a
         python {input.script} -i {input.demuxDir} -m {input.metadata} -o {params.demuxDir}
         """
 
@@ -129,8 +126,6 @@ rule map_files:
     message: "Mapping sample {wildcards.libID}"
     shell:
         """
-        module load Minimap2/2.17-foss-2018a --quiet
-        module load SAMtools/1.10-foss-2018a --quiet
         minimap2 -ax map-ont -t {params.threads} --secondary=no {input.dbFasta_input} {input.fastqFiles} |
         samtools view -F 4 -F 256 -F 2048 - -o {output}
         """
@@ -174,7 +169,7 @@ rule make_map_table:
     message:
         "Creating mapping table of current and previous sequencing runs"
     script:
-        "scripts/create_mapping_tables.R"
+        "/opt/scripts/create_mapping_tables.R"
 
 rule qc_report:
     input:
