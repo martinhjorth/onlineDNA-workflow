@@ -1,5 +1,5 @@
-# Online DNA awesomeness
-Write something....
+# OnlineDNA UDP workflow
+Demultiplexes and maps Nanopore reads barcoded with Illumina UDP-style adapters
 
 ## Software requirements and dependencies
 Run the `install_singularity.sh` script to install singularity either system-wide or only for the current user. Everything is tailored (and tested) for a 64-bit x86 system running Ubuntu Linux 18.04 or later, or Debian Buster or later.
