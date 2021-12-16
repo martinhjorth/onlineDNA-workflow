@@ -47,8 +47,8 @@ then
       exit 1
       ;;
     p )
-      installDir=$OPTARG
-      mkdir -p $(realpath -m "$installDir")
+      installDir=$(realpath -m "$OPTARG")
+      mkdir -p "$installDir"
       if [ ! -w "$installDir" ]
       then
         echo "Destination folder ${installDir} is not writable, exiting..."
@@ -78,14 +78,17 @@ then
   
   scriptMessage "installing system dependencies via APT..."
   #first check if installed before running a sudo command
-  pkgs="build-essential uuid-dev uidmap libgpgme-dev squashfs-tools libseccomp-dev wget make pkg-config git cryptsetup-bin net-tools"
+  pkgs="build-essential uuid-dev uidmap libgpgme11-dev squashfs-tools libseccomp-dev wget make pkg-config git cryptsetup-bin net-tools"
   if ! dpkg -s $pkgs >/dev/null 2>&1
   then
+    echo "One or more system dependencies are not installed, will try to install..."
     sudo apt-get update -qqy
     sudo apt-get install -y $pkgs
+  else
+    echo "Everything is already installed..."
   fi
   
-  scriptMessage "creating temporary folder for software downloads..."
+  scriptMessage "creating temporary folder for downloads and build files..."
   tmp_dir=$(mktemp -d -t singularity_installer_XXXXX)
   pushd "$tmp_dir"
   
@@ -98,6 +101,7 @@ then
 
   #go is only needed for compiling singularity
   export GOPATH=${PWD}/go
+  export OLDPATH=${PATH} #save for later to avoid also adding Go path to $PATH
   export PATH=${PWD}/go/bin:${PATH}
 
   scriptMessage "downloading singularity..."
@@ -112,28 +116,32 @@ then
     make -j -C ./builddir
     make -j -C ./builddir install
 
-    scriptMessage "enabling singularity bash auto-completion for current user by adjusting ${HOME}/.bashrc..."
+    scriptMessage "Adding singularity path to \$PATH and enabling singularity bash auto-completion for current user by adjusting ${HOME}/.bashrc..."
     #detect and remove lines in ~/.bashrc previously added by this 
     #script to avoid inflating $PATH if script is run more than once
     sed -i '/# >>> singularity installer >>>/,/# <<< singularity installer <<</d' ${HOME}/.bashrc
+    
+    #then add lines
     echo "# >>> singularity installer >>>" >> ${HOME}/.bashrc
     echo "#these lines have been added by the install_singularity.sh script" >> ${HOME}/.bashrc
-    echo "export PATH=${installDir}/singularity/bin:$PATH" >> ${HOME}/.bashrc
+    echo "export PATH=${installDir}/singularity/bin:$OLDPATH" >> ${HOME}/.bashrc
     echo ". ${installDir}/singularity/etc/bash_completion.d/singularity" >> ${HOME}/.bashrc
     echo "# <<< singularity installer <<<" >> ${HOME}/.bashrc
 
     scriptMessage "Removing temporary folder and its contents..."
-    sudo rm -rf "$tmp_dir"
+    chmod -R 777 "$tmp_dir"
+    rm -rf "$tmp_dir"
   else
-    scriptMessage "installing singularity system-wide..."
+    scriptMessage "installing singularity system-wide into /usr/local/bin..."
     ./mconfig
     sudo make -j -C ./builddir
     sudo make -j -C ./builddir install
     
     scriptMessage "enabling system-wide singularity bash auto-completion by adjusting /etc/profile..."
-    #detect and remove lines in /etc/profile previously added by this 
-    #script to avoid inflating $PATH if script is run more than once
+    #detect and remove lines in /etc/profile previously added by this script to avoid inflation
     sudo sed -i '/# >>> singularity installer >>>/,/# <<< singularity installer <<</d' /etc/profile
+
+    #then add lines
     echo "# >>> singularity installer >>>" | sudo tee -a /etc/profile
     echo "#these lines have been added by the install_singularity.sh script" | sudo tee -a /etc/profile
     echo ". /usr/local/etc/bash_completion.d/singularity" | sudo tee -a /etc/profile
